@@ -78,7 +78,7 @@ app.get('/user', (req, res) => {
 
         res.json(result.recordset);
     });
-});
+}); 
 
 /* UPDATE */
 app.put('/user/:id', async (req, res) =>{
