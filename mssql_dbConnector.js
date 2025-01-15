@@ -111,3 +111,17 @@ app.put('/user/:id', async (req, res) =>{
 
 
 /* DELETE */
+app.delete('/user/:id', async (req, res) => {
+    try{
+        console.log('Request received:', req.params);
+        const { id } = req.params;
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM dbo.TbTest WHERE id = @id');
+        res.send('Data Delete successfully');
+    }
+    catch (err) {
+        console.error("Server error:", err);
+        res.status(500).send(err.message);
+    }
+})
