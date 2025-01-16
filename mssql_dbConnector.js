@@ -1,10 +1,23 @@
+/// 1. 서버를 포트 3000에서 실행(http://localhost:3000)
+/// 2. SQL 접속 설정
+/// 3. 데이터베이스 연결
+
+// 웹 프레임워크
 const express = require('express');
-const sql = require('mssql');
 const app = express();
+
+// SQL Server에 연결하기 위한 라이브러리
+const sql = require('mssql');
+
 // JSON 데이터 처리 미들웨어
 app.use(express.json());
 
-// SQL 접속 설정
+/// 서버를 포트 3000에서 실행(http://localhost:3000)
+app.listen(3000, () => {
+    console.log('Express server listening on port 3000');
+});
+
+/// SQL 접속 설정
 const pool = new sql.ConnectionPool({
     user: 'sa',                         // DB 사용자 이름
     password: 'sunjin@6817',            // DB 사용자의 암호
@@ -16,9 +29,8 @@ const pool = new sql.ConnectionPool({
     },
 });
 
-// 데이터베이스 연결
-// node .\mssql_dbConnector.js
-pool.connect((err) =>{
+/// 데이터베이스 연결 (node .\mssql_dbConnector.js)
+pool.connect((err) => {
     // 연결이 안될 경우 에러 내용 콘솔에 출력
     if (err) {
         console.error('Error connecting to database:', err);
@@ -29,22 +41,51 @@ pool.connect((err) =>{
     console.log('Connected to database');
 });
 
-app.listen(3000, () => {
-    console.log('Express server listening on port 3000');
-});
+/**  READ  **/
+// 1. 클라이언트가 서버(경로)로 데이터 조회(GET) 요청
+// 2. 서버에서 SQL 쿼리 결과(result.recordset)를 조회 후 JSON 형식으로 클라이언트에 반환
 
-/* CREATE */
-// app.post : HTTP POST 요청을 처리하는 Express 라우트 핸들러
-// '/user' : API의 엔드포인트 URL (이 경로로 POST 요청 보낼 수 있음)
-// async (req, res) : 비동기 함수 정의 
-//  => res : 클라이언트의 요청 데이터 포함 객체 / res : 서버에서 클라이언트로 응답 보낼 때 사용 객체
-app.post('/user', async (req, res) => {
+/*
+app.get('/user/select', ...) : /user/select 경로로 들어오는 GET 요청을 처리
+ => app.get : 클라이언트가 서버에 데이터를 조회
+ => req : 클라이언트의 요청 데이터 포함 객체 / res : 서버에서 클라이언트로 응답 보낼 때 사용 객체
+*/
+
+app.get('/user/select', (req, res) => {
+    // 데이터베이스(SQL Server)에 요청을 준비하는 메서드
+    pool.request().query('SELECT * FROM dbo.TbTest', (err, result) => {
+        if (err) {
+            console.error('Error executing query:', err);
+            res.status(500).send('Error executing query');
+            return;
+        }
+
+        // 서버에서 SQL 쿼리 결과(result.recordset)를 조회 후 JSON 형식으로 클라이언트에 반환
+        res.json(result.recordset);
+    });
+}); 
+
+/** CREATE **/
+// 1. 클라이언트에서 서버(경로)로 POST 요청(새로운 리소스 생성 / 클라이언트에서 데이터를 서버로 보냄)
+// 2. 클라이언트 요청의 본문(req.body)에서 필요한 데이터를 구조 분해 할당으로 추출
+// 3. 요청 본문에서 가져온 값으로 SQL 쿼리 실행
+
+/* 
+app.post('/user/create', ...) : /user 경로로 들어오는 POST 요청을 처리
+ => app.post : HTTP POST 요청을 처리(서버에 데이터를 전송하고, 새로운 리소스를 생성할때 사용)
+ =>'/user/create' : 해당 경로에서 요청을 받음 API의 엔드포인트 URL (이 경로로 POST 요청 보낼 수 있음)
+ => async (req, res) : 비동기 함수 정의 
+ => req : 클라이언트의 요청 데이터 포함 객체 / res : 서버에서 클라이언트로 응답 보낼 때 사용 객체 
+*/
+
+app.post('/user/create', async (req, res) => {
+    // 클라이언트에서 받은 요청 본문 데이터 로그 출력
     console.log('Request received:', req.body);
     try {
-        // 데이터베이스 연결 풀 저장하는 변수
         // 클라이언트 요청의 본문(req.body)에서 필요한 데이터를 구조 분해 할당으로 추출
         const { date, dayOfWeek, category, description, time, bank, income, expense, fulldate } = req.body;
-        // 데이터베이스에 요청을 준비하는 메서드
+
+        // 데이터베이스(SQL Server)에 요청을 준비하는 메서드
         await pool.request()
             // SQL 쿼리에 사용할 입력 파라미터 설정
             //  => 'date' : 파라미터 이름 / sql.VarChar : 데이터 타입 / date : 클라이언트가 보낸 값
@@ -59,33 +100,41 @@ app.post('/user', async (req, res) => {
             .input('fulldate', sql.VarChar, fulldate)
             // SQL 쿼리 실행
             .query('INSERT INTO dbo.TbTest (date, dayOfWeek, category, description, time, bank, income, expense, fulldate) VALUES (@date, @dayOfWeek, @category, @description, @time, @bank, @income, @expense, @fulldate)');
-        res.send('Data inserted successfully');    
+            // 성공 시 클라이언트에 메시지 보냄
+            res.send('Data inserted successfully');    
     }
     catch (err) {
+        // 오류 메세지 출력
         console.error('Server error:', err);
+        // 클라이언트에 HTTP 500 상태 코드와 오류 메시지 보냄
         res.status(500).send(err.message);
     }
 });
 
-/* READ */
-app.get('/user', (req, res) => {
-    pool.request().query('SELECT * FROM dbo.TbTest', (err, result) => {
-        if (err) {
-            console.error('Error executing query:', err);
-            res.status(500).send('Error executing query');
-            return;
-        }
+/** UPDATE **/
+/// 1. 클라이언트에서 서버(경로)로 PUT 요청(기존 리소스 수정 / 클라이언트에서 데이터를 서버로 보냄) 
+/// 2. 클라이언트 요청의 본문(req.body)과 URL에 포함된 ID 값 추출
+/// 3. 요청 본문과 URL에 포함된 값으로 SQL 쿼리 실행
 
-        res.json(result.recordset);
-    });
-}); 
-
-/* UPDATE */
-app.put('/user/:id', async (req, res) =>{
+/* 
+app.put('/user/update/:id', ...) : /user 경로로 들어오는 POST 요청을 처리
+ => app.put : 클라이언트가 서버에 데이터를 전송하여 기존 리소스를 수정
+ =>'/user/update/:id' : 해당 경로에서 요청을 받아 id는 URL 파라미터로 클라이언트가 특정 id 값을 경로에 포함하여 요청
+ => async (req, res) : 비동기 함수 정의 
+ => req : 클라이언트의 요청 데이터 포함 객체 / res : 서버에서 클라이언트로 응답 보낼 때 사용 객체 
+*/
+app.put('/user/update/:id', async (req, res) =>{
     try{
+        // 클라이언트에서 받은 요청 본문 데이터 로그 출력
         console.log('Request received:', req.body);
+
+        // URL 경로에 포함된 id 파라미터 값 추출
         const { id } = req.params;
+
+        // 클라이언트 요청의 본문(req.body)에서 필요한 데이터를 구조 분해 할당으로 추출
         const { date, dayOfWeek, category, description, time, bank, income, expense, fulldate } = req.body;
+
+        // 데이터베이스(SQL Server)에 요청을 준비하는 메서드
         await pool.request()
             // SQL 쿼리에 사용할 입력 파라미터 설정
             //  => 'date' : 파라미터 이름 / sql.VarChar : 데이터 타입 / date : 클라이언트가 보낸 값
@@ -104,24 +153,48 @@ app.put('/user/:id', async (req, res) =>{
         res.send('Data inserted successfully'); 
     }
     catch (err) {
+        // 오류 메세지 출력
         console.error('Server error:', err);
+        // 클라이언트에 HTTP 500 상태 코드와 오류 메시지 보냄
         res.status(500).send(err.message);
     }
 });
 
 
-/* DELETE */
-app.delete('/user/:id', async (req, res) => {
+/** DELETE **/
+/// 1. 클라이언트에서 서버(경로)로 DELETE 요청(데이터 삭제 / 클라이언트에서 데이터를 서버로 보냄) 
+/// 2. URL에 포함된 ID 값 추출
+/// 3. 요청 본문과 URL에 포함된 값으로 SQL 쿼리 실행
+
+/* 
+app.delete('/user/delete/:id', ...) : /user 경로로 들어오는 delete 요청을 처리
+ => app.delete : 클라이언트가 서버에 데이터를 전송하여 해당 ID를 가진 데이터 삭제
+ =>'/user/delete/:id' : 해당 경로에서 요청을 받아 id는 URL 파라미터로 클라이언트가 특정 id 값을 경로에 포함하여 요청
+ => async (req, res) : 비동기 함수 정의 
+ => req : 클라이언트의 요청 데이터 포함 객체 / res : 서버에서 클라이언트로 응답 보낼 때 사용 객체 
+*/
+
+app.delete('/user/delete/:id', async (req, res) => {
     try{
         console.log('Request received:', req.params);
+
+        // URL 경로에 포함된 id 파라미터 값 추출
         const { id } = req.params;
+
+        // 데이터베이스(SQL Server)에 요청을 준비하는 메서드
         await pool.request()
+            // SQL 쿼리에 사용할 입력 파라미터 설정
+            //  => 'date' : 파라미터 이름 / sql.VarChar : 데이터 타입 / date : 클라이언트가 보낸 값
             .input('id', sql.Int, id)
+
+            // SQL 쿼리 실행
             .query('DELETE FROM dbo.TbTest WHERE id = @id');
         res.send('Data Delete successfully');
     }
     catch (err) {
-        console.error("Server error:", err);
+        // 오류 메세지 출력
+        console.error('Server error:', err);
+        // 클라이언트에 HTTP 500 상태 코드와 오류 메시지 보냄
         res.status(500).send(err.message);
     }
-})
+});
