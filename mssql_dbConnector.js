@@ -198,3 +198,36 @@ app.delete('/user/delete/:id', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+
+// 로그인 API
+app.post('/user/login', async (req, res) => {
+    try {
+
+        // 클라이언트 요청의 본문(req.body)에서 필요한 데이터를 구조 분해 할당으로 추출
+        const { username, password } = req.body;
+        console.log(req.body);
+
+        // 아이디와 비밀번호가 없으면 오류 응답
+        if (!username || !password) {
+            return res.status(400).json({ message: "아이디와 비밀번호를 입력하세요." });
+        }
+
+        // SQL 쿼리 실행 (파라미터 바인딩 사용)
+        const result = await pool.request()
+            .input('username', sql.NVarChar, username) // 파라미터 바인딩
+            .input('password', sql.NVarChar, password) // 파라미터 바인딩
+            .query('SELECT * FROM dbo.TbTest2 WHERE username = @username AND password = @password');
+
+        // 사용자가 존재하면 로그인 성공
+        if (result.recordset.length > 0) {
+            return res.json({ success: true });
+        } else {
+            // 사용자 정보가 없으면 로그인 실패
+            return res.json({ success: false });
+        }
+
+    } catch (error) {
+        console.error('로그인 오류:', error);
+        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    }
+});
