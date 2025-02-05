@@ -220,7 +220,8 @@ app.post('/user/login', async (req, res) => {
 
         // 사용자가 존재하면 로그인 성공
         if (result.recordset.length > 0) {
-            return res.json({ success: true });
+            const user = result.recordset[0];
+            return res.json({ success: true, user: user.name });
         } else {
             // 사용자 정보가 없으면 로그인 실패
             return res.json({ success: false });
